@@ -4,30 +4,29 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::rc::Rc;
 use core::cell::RefCell;
-use serde::{Serialize, Deserialize};
-use serde_repr::{Deserialize_repr};
 use libertas::*;
+use libertas_notification::*;
 //use libertas_matter::*;
 use libertas_macros::*;
 
-#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode, Serialize, Deserialize)]
+#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
 pub struct TimeSlot {
     pub start_time: LibertasDateTime,
     pub duration: LibertasTimeOnly,
 }
 
-#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode, Serialize, Deserialize)]
+#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
 pub struct SprinklerZoneInfo {
     pub next_schedule: TimeSlot,
     pub hold_off_periods: Vec<TimeSlot>,
 }
 
-#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode, Serialize, Deserialize)]
+#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
 pub struct UpdateHoldOffRequest {
     pub hold_off_periods: Vec<TimeSlot>,
 }
 
-#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode, Serialize, Deserialize)]
+#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
 pub enum ZoneDataProtocol {
     GetZoneInfo,
     ZoneInfo(SprinklerZoneInfo),
@@ -35,23 +34,23 @@ pub enum ZoneDataProtocol {
 }
 
 #[repr(u8)]
-#[derive(Clone, Deserialize_repr)]
+#[derive(Clone, LibertasAvroDecode)]
 pub enum SoilType { Loam, Clay, ClayLoam, 
     SiltyClay, SandyLoam, LoamySand, Sand }
 
 
 #[repr(u8)]
-#[derive(Clone, Deserialize_repr)]
+#[derive(Clone, LibertasAvroDecode)]
 pub enum PlantType {Lawn, FruitTrees, Flowers,
     Vegetables, Citrus, TreesBushes, Xeriscape }
 
 
 #[repr(u8)]
-#[derive(Clone, Deserialize_repr)]
+#[derive(Clone, LibertasAvroDecode)]
 pub enum SprinklerHead {SurfaceDrip, Bubblers,
     PopupSpray, RotorsLowRate, RotorsHighRate }
 
-#[derive(Clone, LibertasExport, Deserialize)]
+#[derive(Clone, LibertasExport, LibertasAvroDecode)]
 pub struct SprinklerZone {
     pub zone_valve: LibertasDevice,
     pub field_capacity: u8,
@@ -67,6 +66,7 @@ struct ZoneData {
     zone: SprinklerZone,
     next_schedule: TimeSlot,
     hold_off_periods: Vec<TimeSlot>,
+    notification_list: Vec<LibertasUser>
 }
 
 fn send_data(zone_data: &ZoneData, trans_id: Option<LibertasTransId>, peer: u32) {
@@ -82,7 +82,8 @@ fn send_data(zone_data: &ZoneData, trans_id: Option<LibertasTransId>, peer: u32)
 }
 
 pub fn libertas_sprinkler (
-        zones: Vec<SprinklerZone>) {
+    notification_list: Vec<LibertasUser>,
+    zones: Vec<SprinklerZone>) {
     let mut cur_start_time: u64 = libertas_get_utc_time().unwrap() / 1000000;     // us to seconds
     cur_start_time /= 60;           // round down to the nearest minute so that it's easier to read out
     cur_start_time *= 60;
@@ -98,6 +99,7 @@ pub fn libertas_sprinkler (
                         duration: cur_duration,
                     },
                     hold_off_periods: Vec::new(),
+                    notification_list: notification_list.clone(),
                 }
             ));
         cur_start_time = cur_start_time + cur_duration as u64;
@@ -143,8 +145,17 @@ pub fn libertas_sprinkler (
                                         break; 
                                     }
                                 }
-                            }                            
+                            }
 
+                            let arguments: [NotificationArgument; 1] = [
+                                NotificationArgument::Object(data.zone.zone_valve),
+                            ];
+                            libertas_send_notification(
+                                &data.notification_list, 
+                                NotificationImportance::AlertLow,
+                                Some(data.zone.zone_valve), 
+                                "HoldOffUpdated", 
+                                &arguments);
                             let d = &*data;
                             send_data(d, Some(trans_id), peer);
                             send_data(d, None, LIBERTAS_BROADCAST_DEST);
@@ -157,19 +168,3 @@ pub fn libertas_sprinkler (
     }
 }
 
-
-/*
-#[derive(Clone, LibertasExport, Deserialize)]
-pub struct SprinklerZone2 {
-    pub zone_valve: LibertasDevice,
-    pub field_capacity: u8,
-    pub soil_type: SoilType,
-    pub plant_type: PlantType,
-    pub head: SprinklerHead,
-}
-
-
-pub fn libertas_sprinkler2 (
-        _zones: Vec<SprinklerZone2>) {
-}
- */
