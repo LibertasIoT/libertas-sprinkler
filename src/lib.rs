@@ -62,25 +62,6 @@ pub struct SprinklerZone {
     pub zone_info: LibertasAgentTool,
 }
 
-struct ZoneData {
-    zone: SprinklerZone,
-    next_schedule: TimeSlot,
-    hold_off_periods: Vec<TimeSlot>,
-    notification_list: Vec<LibertasUser>
-}
-
-fn send_data(zone_data: &ZoneData, trans_id: Option<LibertasTransId>, peer: u32) {
-    let info = ZoneDataProtocol::ZoneInfo(SprinklerZoneInfo {
-        next_schedule: zone_data.next_schedule.clone(),
-        hold_off_periods: zone_data.hold_off_periods.clone(),
-    });
-    if let Some(trans_id) = trans_id {
-        libertas_agent_tool_response(zone_data.zone.zone_info, &info, trans_id, peer);
-    } else {
-        libertas_agent_tool_report(zone_data.zone.zone_info, &info, Some(peer));
-    }
-}
-
 pub fn libertas_sprinkler (
     notification_list: Vec<LibertasUser>,
     zones: Vec<SprinklerZone>) {
@@ -168,3 +149,21 @@ pub fn libertas_sprinkler (
     }
 }
 
+struct ZoneData {
+    zone: SprinklerZone,
+    next_schedule: TimeSlot,
+    hold_off_periods: Vec<TimeSlot>,
+    notification_list: Vec<LibertasUser>
+}
+
+fn send_data(zone_data: &ZoneData, trans_id: Option<LibertasTransId>, peer: u32) {
+    let info = ZoneDataProtocol::ZoneInfo(SprinklerZoneInfo {
+        next_schedule: zone_data.next_schedule.clone(),
+        hold_off_periods: zone_data.hold_off_periods.clone(),
+    });
+    if let Some(trans_id) = trans_id {
+        libertas_agent_tool_response(zone_data.zone.zone_info, &info, trans_id, peer);
+    } else {
+        libertas_agent_tool_report(zone_data.zone.zone_info, &info, Some(peer));
+    }
+}
