@@ -5,13 +5,13 @@ use alloc::vec::Vec;
 use alloc::rc::Rc;
 use core::cell::RefCell;
 use libertas::*;
-//use libertas_matter::*;
 use libertas_macros::*;
+//use libertas_matter::*;
 
 #[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
 pub struct TimeSlot {
     pub start_time: LibertasDateTime,
-    pub duration: LibertasTimeOnly,
+    pub duration: u32,
 }
 
 #[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
@@ -130,7 +130,7 @@ pub fn libertas_sprinkler (
                             let arguments: [NotificationArgument; 1] = [
                                 NotificationArgument::Object(data.zone.zone_valve),
                             ];
-                            libertas_send_notification(
+                            libertas_notification_send(
                                 &data.notification_list, 
                                 NotificationImportance::AlertLow,
                                 Some(data.zone.zone_valve), 
