@@ -8,28 +8,27 @@ use libertas::*;
 use libertas_macros::*;
 //use libertas_matter::*;
 
-#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
+pub static APP_STRINGS: [(&str, &str); 2] = [
+    ("HoldOffUpdated", "Operation completed successfully."),
+];
+
+#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode, LibertasExport)]
 pub struct TimeSlot {
     pub start_time: LibertasDateTime,
+    #[libertas_time_interval]
     pub duration: u32,
 }
 
-#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
-pub struct SprinklerZoneInfo {
-    pub next_schedule: TimeSlot,
-    pub hold_off_periods: Vec<TimeSlot>,
-}
-
-#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
-pub struct UpdateHoldOffRequest {
-    pub hold_off_periods: Vec<TimeSlot>,
-}
-
-#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode)]
+#[derive(Clone, LibertasAvroDecode, LibertasAvroEncode, LibertasExport)]
 pub enum ZoneDataProtocol {
     GetZoneInfo,
-    ZoneInfo(SprinklerZoneInfo),
-    UpdateHoldOff(UpdateHoldOffRequest),
+    ZoneInfo {
+        next_schedule: TimeSlot,
+        hold_off_periods: Vec<TimeSlot>,
+    },
+    UpdateHoldOff {
+        hold_off_periods: Vec<TimeSlot>,
+    },
 }
 
 #[repr(u8)]
@@ -97,8 +96,8 @@ pub fn libertas_sprinkler (
                                 send_data(&*data, None, peer);
                             }
                         },
-                        ZoneDataProtocol::UpdateHoldOff(req) => {
-                            data.hold_off_periods = req.hold_off_periods;
+                        ZoneDataProtocol::UpdateHoldOff { hold_off_periods } => {
+                            data.hold_off_periods = hold_off_periods;
                             // sort hold off periods by start time
                             data.hold_off_periods.sort_by_key(|h| h.start_time);
                             // If there is an overlay between the next schedule and any hold off period, we shift 
@@ -156,10 +155,10 @@ struct ZoneData {
 }
 
 fn send_data(zone_data: &ZoneData, trans_id: Option<LibertasTransId>, peer: u32) {
-    let info = ZoneDataProtocol::ZoneInfo(SprinklerZoneInfo {
+    let info = ZoneDataProtocol::ZoneInfo{
         next_schedule: zone_data.next_schedule.clone(),
         hold_off_periods: zone_data.hold_off_periods.clone(),
-    });
+    };
     if let Some(trans_id) = trans_id {
         libertas_agent_tool_response(zone_data.zone.zone_info, &info, trans_id, peer);
     } else {
